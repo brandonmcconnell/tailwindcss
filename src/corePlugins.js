@@ -140,36 +140,15 @@ export let variantPlugins = {
       'disabled',
     ].map((variant) => (Array.isArray(variant) ? variant : [variant, `&:${variant}`]))
 
-    // First register all `not-` variants (so that they lose specificity-battles when there's a tie)
     for (let [variantName, state] of pseudoVariants) {
+      // First register all `not-` variants (so that they lose specificity-battles when there's a tie)
       addVariant(`not-${variantName}`, (ctx) => {
         let result = typeof state === 'function' ? state(ctx) : state
-
         return result.replace(/&(\S+)/, '&:not($1)')
       })
-    }
-
-    for (let [variantName, state] of pseudoVariants) {
-      addVariant(`group-not-${variantName}`, (ctx) => {
-        let result = typeof state === 'function' ? state(ctx) : state
-
-        return result.replace(/&(\S+)/, ':merge(.group):not($1) &')
-      })
-    }
-
-    for (let [variantName, state] of pseudoVariants) {
-      addVariant(`peer-not-${variantName}`, (ctx) => {
-        let result = typeof state === 'function' ? state(ctx) : state
-
-        return result.replace(/&(\S+)/, ':merge(.peer):not($1) ~ &')
-      })
-    }
-
-    // Now register the non-`not-` variants
-    for (let [variantName, state] of pseudoVariants) {
+      // Now register the non-`not-` variants
       addVariant(variantName, (ctx) => {
         let result = typeof state === 'function' ? state(ctx) : state
-
         return result
       })
     }
@@ -186,6 +165,19 @@ export let variantPlugins = {
     }
 
     for (let [name, fn] of Object.entries(variants)) {
+      // First register all `not-` variants (so that they lose specificity-battles when there's a tie)
+      matchVariant(
+        `${name}-not`,
+        (value = '', extra) => {
+          let result = normalize(typeof value === 'function' ? value(extra) : value)
+          if (!result.includes('&')) result = '&' + result
+
+          let [a, b] = fn('', extra)
+          return result.replace(/&(\S+)?/g, (_, pseudo = '') => `${a}:not(${pseudo})${b}`)
+        },
+        { values: Object.fromEntries(pseudoVariants) }
+      )
+      // Now register the non-`not-` variants
       matchVariant(
         name,
         (value = '', extra) => {
@@ -193,7 +185,7 @@ export let variantPlugins = {
           if (!result.includes('&')) result = '&' + result
 
           let [a, b] = fn('', extra)
-          return result.replace(/&(\S+)?/g, (_, pseudo = '') => a + pseudo + b)
+          return result.replace(/&(\S+)?/g, (_, pseudo = '') => `${a}${pseudo}${b}`)
         },
         { values: Object.fromEntries(pseudoVariants) }
       )
