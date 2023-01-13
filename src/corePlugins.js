@@ -140,6 +140,32 @@ export let variantPlugins = {
       'disabled',
     ].map((variant) => (Array.isArray(variant) ? variant : [variant, `&:${variant}`]))
 
+    // First register all `not-` variants (so that they lose specificity-battles when there's a tie)
+    for (let [variantName, state] of pseudoVariants) {
+      addVariant(`not-${variantName}`, (ctx) => {
+        let result = typeof state === 'function' ? state(ctx) : state
+
+        return result.replace(/&(\S+)/, '&:not($1)')
+      })
+    }
+
+    for (let [variantName, state] of pseudoVariants) {
+      addVariant(`group-not-${variantName}`, (ctx) => {
+        let result = typeof state === 'function' ? state(ctx) : state
+
+        return result.replace(/&(\S+)/, ':merge(.group):not($1) &')
+      })
+    }
+
+    for (let [variantName, state] of pseudoVariants) {
+      addVariant(`peer-not-${variantName}`, (ctx) => {
+        let result = typeof state === 'function' ? state(ctx) : state
+
+        return result.replace(/&(\S+)/, ':merge(.peer):not($1) ~ &')
+      })
+    }
+
+    // Now register the non-`not-` variants
     for (let [variantName, state] of pseudoVariants) {
       addVariant(variantName, (ctx) => {
         let result = typeof state === 'function' ? state(ctx) : state
