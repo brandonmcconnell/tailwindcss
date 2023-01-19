@@ -21,6 +21,8 @@ test('variants', () => {
     let expectedPath = path.resolve(__dirname, './variants.test.css')
     let expected = fs.readFileSync(expectedPath, 'utf8')
 
+    console.log(result, expected)
+
     expect(result.css).toMatchFormattedCss(expected)
   })
 })
@@ -839,16 +841,16 @@ test('hoverOnlyWhenSupported adds hover and pointer media features by default', 
         .not-hover\:underline:not(:hover) {
           text-decoration-line: underline;
         }
-        .group:not(:hover) .group-not-hover\:underline {
-          text-decoration-line: underline;
-        }
-        .peer:not(:hover) ~ .peer-not-hover\:underline {
-          text-decoration-line: underline;
-        }
         .hover\:underline:hover {
           text-decoration-line: underline;
         }
+        .group:not(:hover) .group-not-hover\:underline {
+          text-decoration-line: underline;
+        }
         .group:hover .group-hover\:underline {
+          text-decoration-line: underline;
+        }
+        .peer:not(:hover) ~ .peer-not-hover\:underline {
           text-decoration-line: underline;
         }
         .peer:hover ~ .peer-hover\:underline {
