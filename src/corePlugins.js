@@ -230,13 +230,16 @@ export let variantPlugins = {
     }
 
     if (mode === 'class') {
+      addVariant('light', `&:not(${className} &)`)
       addVariant('dark', `${className} &`)
     } else if (mode === 'media') {
+      addVariant('light', '@media (prefers-color-scheme: light)')
       addVariant('dark', '@media (prefers-color-scheme: dark)')
     }
   },
 
   printVariant: ({ addVariant }) => {
+    addVariant('screen', '@media screen')
     addVariant('print', '@media print')
   },
 
@@ -369,6 +372,32 @@ export let variantPlugins = {
 
   supportsVariants: ({ matchVariant, theme }) => {
     matchVariant(
+      'not-supports',
+      (value = '') => {
+        let check = normalize(value)
+        let isRaw = /^\w*\s*\(/.test(check)
+
+        // Chrome has a bug where `(condtion1)or(condition2)` is not valid
+        // But `(condition1) or (condition2)` is supported.
+        check = isRaw ? check.replace(/\b(and|or|not)\b/g, ' $1 ') : check
+
+        if (isRaw) {
+          return `@supports not ${check}`
+        }
+
+        if (!check.includes(':')) {
+          check = `${check}: var(--tw)`
+        }
+
+        if (!(check.startsWith('(') && check.endsWith(')'))) {
+          check = `(${check})`
+        }
+
+        return `@supports not ${check}`
+      },
+      { values: theme('supports') ?? {} }
+    )
+    matchVariant(
       'supports',
       (value = '') => {
         let check = normalize(value)
@@ -397,13 +426,32 @@ export let variantPlugins = {
   },
 
   ariaVariants: ({ matchVariant, theme }) => {
+    matchVariant('not-aria', (value) => `&:not([aria-${normalize(value)}])`, {
+      values: theme('aria') ?? {},
+    })
     matchVariant('aria', (value) => `&[aria-${normalize(value)}]`, { values: theme('aria') ?? {} })
+    matchVariant(
+      'group-not-aria',
+      (value, { modifier }) =>
+        modifier
+          ? `:merge(.group\\/${modifier}):not([aria-${normalize(value)}]) &`
+          : `:merge(.group):not([aria-${normalize(value)}]) &`,
+      { values: theme('aria') ?? {} }
+    )
     matchVariant(
       'group-aria',
       (value, { modifier }) =>
         modifier
           ? `:merge(.group\\/${modifier})[aria-${normalize(value)}] &`
           : `:merge(.group)[aria-${normalize(value)}] &`,
+      { values: theme('aria') ?? {} }
+    )
+    matchVariant(
+      'peer-not-aria',
+      (value, { modifier }) =>
+        modifier
+          ? `:merge(.peer\\/${modifier}):not([aria-${normalize(value)}]) ~ &`
+          : `:merge(.peer):not([aria-${normalize(value)}]) ~ &`,
       { values: theme('aria') ?? {} }
     )
     matchVariant(
@@ -417,13 +465,32 @@ export let variantPlugins = {
   },
 
   dataVariants: ({ matchVariant, theme }) => {
+    matchVariant('not-data', (value) => `&:not([data-${normalize(value)}])`, {
+      values: theme('data') ?? {},
+    })
     matchVariant('data', (value) => `&[data-${normalize(value)}]`, { values: theme('data') ?? {} })
+    matchVariant(
+      'group-not-data',
+      (value, { modifier }) =>
+        modifier
+          ? `:merge(.group\\/${modifier}):not([data-${normalize(value)}]) &`
+          : `:merge(.group):not([data-${normalize(value)}]) &`,
+      { values: theme('data') ?? {} }
+    )
     matchVariant(
       'group-data',
       (value, { modifier }) =>
         modifier
           ? `:merge(.group\\/${modifier})[data-${normalize(value)}] &`
           : `:merge(.group)[data-${normalize(value)}] &`,
+      { values: theme('data') ?? {} }
+    )
+    matchVariant(
+      'peer-not-data',
+      (value, { modifier }) =>
+        modifier
+          ? `:merge(.peer\\/${modifier}):not([data-${normalize(value)}]) ~ &`
+          : `:merge(.peer):not([data-${normalize(value)}]) ~ &`,
       { values: theme('data') ?? {} }
     )
     matchVariant(
