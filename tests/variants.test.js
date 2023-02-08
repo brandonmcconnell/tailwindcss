@@ -1,6 +1,14 @@
 import fs from 'fs'
 import path from 'path'
 import postcss from 'postcss'
+const prettier = require('prettier')
+
+function format(input) {
+  return prettier.format(input, {
+    parser: 'css',
+    printWidth: 100,
+  })
+}
 
 import { run, css, html, defaults } from './util/run'
 
@@ -21,7 +29,7 @@ test('variants', () => {
     let expectedPath = path.resolve(__dirname, './variants.test.css')
     let expected = fs.readFileSync(expectedPath, 'utf8')
 
-    console.log(result, expected)
+    const [a, b] = [expected, result.content].map(str => format(str.trim()))
 
     expect(result.css).toMatchFormattedCss(expected)
   })
