@@ -9,6 +9,8 @@ use tracing::event;
 use walkdir::WalkDir;
 
 pub mod candidate;
+pub mod cursor;
+pub mod fast_skip;
 pub mod glob;
 pub mod location;
 pub mod modifier;
@@ -43,7 +45,7 @@ pub fn resolve_content_paths(args: ContentPathInfo) -> Vec<String> {
     let root = Path::new(&args.base);
 
     let allowed_paths = FxHashSet::from_iter(
-        WalkBuilder::new(&root)
+        WalkBuilder::new(root)
             .hidden(false)
             .filter_entry(|entry| match entry.file_type() {
                 Some(file_type) if file_type.is_dir() => entry
@@ -94,7 +96,7 @@ pub fn resolve_content_paths(args: ContentPathInfo) -> Vec<String> {
 
     // Collect all valid paths from the root. This will already filter out ignored files, unknown
     // extensions and binary files.
-    let mut it = WalkDir::new(&root)
+    let mut it = WalkDir::new(root)
         // Sorting to make sure that we always see the directories before the files. Also sorting
         // alphabetically by default.
         .sort_by(
@@ -334,11 +336,6 @@ impl From<u8> for Parsing {
             _ => unimplemented!("Unknown 'Parsing' strategy"),
         }
     }
-}
-
-pub fn parse_candidate_strings_from_files(changed_content: Vec<ChangedContent>) -> Vec<String> {
-    init_tracing();
-    parse_all_blobs(read_all_files(changed_content))
 }
 
 pub fn parse_candidate_strings(input: Vec<ChangedContent>, options: u8) -> Vec<String> {

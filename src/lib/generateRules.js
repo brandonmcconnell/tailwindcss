@@ -13,7 +13,7 @@ import {
 } from '../util/formatVariantSelector'
 import { asClass } from '../util/nameClass'
 import { normalize } from '../util/dataTypes'
-import { isValidVariantFormatString, parseVariant } from './setupContextUtils'
+import { isValidVariantFormatString, parseVariant, INTERNAL_FEATURES } from './setupContextUtils'
 import isValidArbitraryValue from '../util/isSyntacticallyValidPropertyValue'
 import { splitAtTopLevelOnly } from '../util/splitAtTopLevelOnly.js'
 import { flagEnabled } from '../featureFlags'
@@ -45,7 +45,7 @@ function* candidatePermutations(candidate) {
       let bracketIdx = candidate.indexOf('[')
 
       // If character before `[` isn't a dash or a slash, this isn't a dynamic class
-      // eg. string[]
+      // e.g. string[]
       if (candidate[bracketIdx - 1] === '-') {
         dashIdx = bracketIdx - 1
       } else if (candidate[bracketIdx - 1] === '/') {
@@ -175,10 +175,6 @@ function applyVariant(variant, matches, context) {
     if (modifiers.length && !context.variantMap.has(variant)) {
       variant = baseVariant
       args.modifier = modifiers[0]
-
-      if (!flagEnabled(context.tailwindConfig, 'generalizedModifiers')) {
-        return []
-      }
     }
   }
 
@@ -193,13 +189,13 @@ function applyVariant(variant, matches, context) {
     //   group[:hover]    (`-` is missing)
     let match = /(.)(-?)\[(.*)\]/g.exec(variant)
     if (match) {
-      let [, char, seperator, value] = match
+      let [, char, separator, value] = match
       // @-[200px] case
-      if (char === '@' && seperator === '-') return []
+      if (char === '@' && separator === '-') return []
       // group[:hover] case
-      if (char !== '@' && seperator === '') return []
+      if (char !== '@' && separator === '') return []
 
-      variant = variant.replace(`${seperator}[${value}]`, '')
+      variant = variant.replace(`${separator}[${value}]`, '')
       args.value = value
     }
   }
@@ -230,8 +226,15 @@ function applyVariant(variant, matches, context) {
 
   if (context.variantMap.has(variant)) {
     let isArbitraryVariant = isArbitraryValue(variant)
+    let internalFeatures = context.variantOptions.get(variant)?.[INTERNAL_FEATURES] ?? {}
     let variantFunctionTuples = context.variantMap.get(variant).slice()
     let result = []
+
+    let respectPrefix = (() => {
+      if (isArbitraryVariant) return false
+      if (internalFeatures.respectPrefix === false) return false
+      return true
+    })()
 
     for (let [meta, rule] of matches) {
       // Don't generate variants for user css
@@ -293,7 +296,7 @@ function applyVariant(variant, matches, context) {
           format(selectorFormat) {
             collectedFormats.push({
               format: selectorFormat,
-              isArbitraryVariant,
+              respectPrefix,
             })
           },
           args,
@@ -322,7 +325,7 @@ function applyVariant(variant, matches, context) {
         if (typeof ruleWithVariant === 'string') {
           collectedFormats.push({
             format: ruleWithVariant,
-            isArbitraryVariant,
+            respectPrefix,
           })
         }
 
@@ -366,7 +369,7 @@ function applyVariant(variant, matches, context) {
             //                    format: .foo &
             collectedFormats.push({
               format: modified.replace(rebuiltBase, '&'),
-              isArbitraryVariant,
+              respectPrefix,
             })
             rule.selector = before
           })
@@ -459,9 +462,9 @@ function isParsableNode(node) {
 }
 
 function isParsableCssValue(property, value) {
-  // We don't want to to treat [https://example.com] as a custom property
+  // We don't want to treat [https://example.com] as a custom property
   // Even though, according to the CSS grammar, it's a totally valid CSS declaration
-  // So we short-circuit here by checking if the custom property looks like a url
+  // So we short-circuit here by checking if the custom property looks like a URL
   if (looksLikeUri(`${property}:${value}`)) {
     return false
   }

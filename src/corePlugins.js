@@ -10,7 +10,6 @@ import withAlphaVariable, { withAlphaValue } from './util/withAlphaVariable'
 import toColorValue from './util/toColorValue'
 import isPlainObject from './util/isPlainObject'
 import transformThemeValue from './util/transformThemeValue'
-import { version as tailwindVersion } from '../package.json'
 import log from './util/log'
 import {
   normalizeScreens,
@@ -22,6 +21,7 @@ import { formatBoxShadowValue, parseBoxShadowValue } from './util/parseBoxShadow
 import { removeAlphaVariables } from './util/removeAlphaVariables'
 import { flagEnabled } from './featureFlags'
 import { normalize } from './util/dataTypes'
+import { INTERNAL_FEATURES } from './lib/setupContextUtils'
 
 export let variantPlugins = {
   pseudoElementVariants: ({ addVariant }) => {
@@ -80,7 +80,7 @@ export let variantPlugins = {
     })
   },
 
-  pseudoClassVariants: ({ addVariant, matchVariant, config }) => {
+  pseudoClassVariants: ({ addVariant, matchVariant, config, prefix }) => {
     let pseudoVariants = [
       // Positional
       ['first', '&:first-child'],
@@ -151,12 +151,12 @@ export let variantPlugins = {
     let variants = {
       group: (_, { modifier }) =>
         modifier
-          ? [`:merge(.group\\/${escapeClassName(modifier)})`, ' &']
-          : [`:merge(.group)`, ' &'],
+          ? [`:merge(${prefix('.group')}\\/${escapeClassName(modifier)})`, ' &']
+          : [`:merge(${prefix('.group')})`, ' &'],
       peer: (_, { modifier }) =>
         modifier
-          ? [`:merge(.peer\\/${escapeClassName(modifier)})`, ' ~ &']
-          : [`:merge(.peer)`, ' ~ &'],
+          ? [`:merge(${prefix('.peer')}\\/${escapeClassName(modifier)})`, ' ~ &']
+          : [`:merge(${prefix('.peer')})`, ' ~ &'],
     }
 
     for (let [name, fn] of Object.entries(variants)) {
@@ -192,7 +192,12 @@ export let variantPlugins = {
 
           return result.slice(0, start) + a + result.slice(start + 1, end) + b + result.slice(end)
         },
-        { values: Object.fromEntries(pseudoVariants) }
+        {
+          values: Object.fromEntries(pseudoVariants),
+          [INTERNAL_FEATURES]: {
+            respectPrefix: false,
+          },
+        }
       )
     }
   },
@@ -386,6 +391,26 @@ export let variantPlugins = {
     )
   },
 
+  hasVariants: ({ matchVariant }) => {
+    matchVariant('has', (value) => `&:has(${normalize(value)})`, { values: {} })
+    matchVariant(
+      'group-has',
+      (value, { modifier }) =>
+        modifier
+          ? `:merge(.group\\/${modifier}):has(${normalize(value)}) &`
+          : `:merge(.group):has(${normalize(value)}) &`,
+      { values: {} }
+    )
+    matchVariant(
+      'peer-has',
+      (value, { modifier }) =>
+        modifier
+          ? `:merge(.peer\\/${modifier}):has(${normalize(value)}) ~ &`
+          : `:merge(.peer):has(${normalize(value)}) ~ &`,
+      { values: {} }
+    )
+  },
+
   ariaVariants: ({ matchVariant, theme }) => {
     matchVariant('aria', (value) => `&[aria-${normalize(value)}]`, { values: theme('aria') ?? {} })
     matchVariant(
@@ -476,12 +501,7 @@ export let corePlugins = {
       fs.readFileSync(path.join(__dirname, './css/preflight.css'), 'utf8')
     )
 
-    addBase([
-      postcss.comment({
-        text: `! tailwindcss v${tailwindVersion} | MIT License | https://tailwindcss.com`,
-      }),
-      ...preflightStyles.nodes,
-    ])
+    addBase(preflightStyles.nodes)
   },
 
   container: (() => {
@@ -913,7 +933,7 @@ export let corePlugins = {
   },
 
   animation: ({ matchUtilities, theme, config }) => {
-    let prefixName = (name) => `${config('prefix')}${escapeClassName(name)}`
+    let prefixName = (name) => escapeClassName(config('prefix') + name)
     let keyframes = Object.fromEntries(
       Object.entries(theme('keyframes') ?? {}).map(([key, value]) => {
         return [key, { [`@keyframes ${prefixName(key)}`]: value }]
@@ -1255,13 +1275,13 @@ export let corePlugins = {
     ],
   ]),
 
-  space: ({ matchUtilities, addUtilities, theme }) => {
+  space: ({ matchUtilities, addUtilities, theme, config }) => {
     matchUtilities(
       {
         'space-x': (value) => {
           value = value === '0' ? '0px' : value
 
-          if (__OXIDE__) {
+          if (flagEnabled(config(), 'logicalSiblingUtilities')) {
             return {
               '& > :not([hidden]) ~ :not([hidden])': {
                 '--tw-space-x-reverse': '0',
@@ -1300,13 +1320,13 @@ export let corePlugins = {
     })
   },
 
-  divideWidth: ({ matchUtilities, addUtilities, theme }) => {
+  divideWidth: ({ matchUtilities, addUtilities, theme, config }) => {
     matchUtilities(
       {
         'divide-x': (value) => {
           value = value === '0' ? '0px' : value
 
-          if (__OXIDE__) {
+          if (flagEnabled(config(), 'logicalSiblingUtilities')) {
             return {
               '& > :not([hidden]) ~ :not([hidden])': {
                 '@defaults border-width': {},
@@ -1500,6 +1520,14 @@ export let corePlugins = {
       '.whitespace-pre-line': { 'white-space': 'pre-line' },
       '.whitespace-pre-wrap': { 'white-space': 'pre-wrap' },
       '.whitespace-break-spaces': { 'white-space': 'break-spaces' },
+    })
+  },
+
+  textWrap: ({ addUtilities }) => {
+    addUtilities({
+      '.text-wrap': { 'text-wrap': 'wrap' },
+      '.text-nowrap': { 'text-wrap': 'nowrap' },
+      '.text-balance': { 'text-wrap': 'balance' },
     })
   },
 

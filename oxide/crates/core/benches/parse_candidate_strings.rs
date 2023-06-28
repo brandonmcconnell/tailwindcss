@@ -1,6 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use std::path::PathBuf;
-use tailwindcss_core::{parse_candidate_strings_from_files, ChangedContent};
+use tailwindcss_core::{parse_candidate_strings, ChangedContent, Parsing, IO};
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     // current_dir will be set to ./crates/core
@@ -11,7 +11,6 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
     let mut all_files: Vec<(u64, PathBuf)> = std::fs::read_dir(fixtures_path)
         .unwrap()
-        .into_iter()
         .filter_map(Result::ok)
         .map(|dir_entry| dir_entry.path())
         .filter(|path| path.is_file())
@@ -51,8 +50,13 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         })
         .collect();
 
-    c.bench_function("parse_candidate_strings_from_files", |b| {
-        b.iter(|| parse_candidate_strings_from_files(changed_content.clone()))
+    c.bench_function("parse_candidate_strings", |b| {
+        b.iter(|| {
+            parse_candidate_strings(
+                changed_content.clone(),
+                Parsing::Parallel as u8 | IO::Parallel as u8,
+            )
+        })
     });
 }
 

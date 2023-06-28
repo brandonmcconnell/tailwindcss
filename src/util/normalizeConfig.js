@@ -1,4 +1,4 @@
-import { flagEnabled } from '../featureFlags'
+import { flagEnabled, featureFlags } from '../featureFlags'
 import log, { dim } from './log'
 
 export function normalizeConfig(config) {
@@ -185,31 +185,6 @@ export function normalizeConfig(config) {
     config.prefix = config.prefix ?? ''
   }
 
-  let auto = (() => {
-    // Config still has a `purge` option (for backwards compatibility), auto content should not be
-    // used
-    if (config.purge) return false
-
-    //
-    if (config.content === 'auto') return true
-
-    // We don't have content at all, auto content should be used
-    if (config.content === undefined) return true
-
-    // We do have content as an object, but we don't have any files defined, auto content should
-    // be used
-    if (
-      typeof config.content === 'object' &&
-      config.content !== null &&
-      !Array.isArray(config.content)
-    ) {
-      return config.content.files === undefined
-    }
-
-    // We do have content defined, auto content should not be used
-    return false
-  })()
-
   // Normalize the `content`
   config.content = {
     relative: (() => {
@@ -222,20 +197,23 @@ export function normalizeConfig(config) {
       return flagEnabled(config, 'relativeContentPathsByDefault')
     })(),
 
-    files: auto
-      ? 'auto'
-      : (() => {
-          let { content, purge } = config
+    files: (() => {
+      let { content, purge } = config
 
-          if (content === undefined && purge === undefined) return []
-          if (Array.isArray(purge)) return purge
-          if (Array.isArray(purge?.content)) return purge.content
-          if (Array.isArray(content)) return content
-          if (Array.isArray(content?.content)) return content.content
-          if (Array.isArray(content?.files)) return content.files
+      if (content === undefined && purge === undefined) return []
+      if (purge) {
+        if (Array.isArray(purge)) return purge
+        if (Array.isArray(purge?.content)) return purge.content
+        return []
+      }
 
-          return []
-        })(),
+      if (Array.isArray(content)) return content
+      if (Array.isArray(content?.content)) return content.content
+      if (Array.isArray(content?.files)) return content.files
+      if (content === 'auto') return ['auto']
+
+      return []
+    })(),
 
     extract: (() => {
       let extract = (() => {
@@ -314,6 +292,21 @@ export function normalizeConfig(config) {
 
       return transformers
     })(),
+  }
+
+  // Force disable the `oxideParser` feature flag when using unsupported features.
+  // TODO: Remove once we have prefix or separator support in the oxide parser.
+  if (config.prefix !== '' || config.separator !== ':') {
+    if (config.experimental === 'all') {
+      config.experimental = {}
+      for (let key in featureFlags.experimental) {
+        config.experimental[key] = true
+      }
+    } else {
+      config.experimental = config.experimental ?? {}
+    }
+
+    config.experimental.oxideParser = false
   }
 
   // Validate globs to prevent bogus globs.

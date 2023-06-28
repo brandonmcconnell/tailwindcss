@@ -1,4 +1,4 @@
-use napi::bindgen_prelude::ToNapiValue;
+use napi::bindgen_prelude::{FromNapiValue, ToNapiValue};
 use std::path::PathBuf;
 
 #[macro_use]
@@ -20,13 +20,6 @@ impl From<ChangedContent> for tailwindcss_core::ChangedContent {
       extension: changed_content.extension,
     }
   }
-}
-
-#[napi]
-pub fn parse_candidate_strings_from_files(changed_content: Vec<ChangedContent>) -> Vec<String> {
-  tailwindcss_core::parse_candidate_strings_from_files(
-    changed_content.into_iter().map(Into::into).collect(),
-  )
 }
 
 #[derive(Debug, Clone)]
